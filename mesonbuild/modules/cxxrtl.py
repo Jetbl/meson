@@ -60,7 +60,7 @@ class CxxrtlModule(NewExtensionModule):
         self.tools['yosys'] = state.find_program('yosys')
         self.tools['cxxrtl-driver'] = state.find_program('cxxrtl-driver')
 
-    @typed_pos_args('cxxrtl.generate', str, (str, File))
+    @typed_pos_args('cxxrtl.generate', str, (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList))
     @typed_kwargs('cxxrtl.generate', KwargInfo('script', (str, File), default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'))    
     def generate(self, state: ModuleState, args: T.Tuple[str, T.List[T.Union[FileOrString, build.GeneratedTypes]]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
@@ -69,7 +69,7 @@ class CxxrtlModule(NewExtensionModule):
         script = kwargs['script']
 
         cc_target = build.CustomTarget(
-            f'{proj_name}_cxxrtl',
+            f'{proj_name}_cc',
             state.subdir,
             state.subproject,
             state.environment,
@@ -81,7 +81,7 @@ class CxxrtlModule(NewExtensionModule):
         return ModuleReturnValue(cc_target, [cc_target])
 
     @typed_pos_args('cxxrtl.sim', str, (str, File, build.BuildTarget))
-    @typed_kwargs('cxxrtl.sim', KwargInfo('data', (str, File, )), KwargInfo('interface', (str, File)), KwargInfo('vcd', bool, default=False))
+    @typed_kwargs('cxxrtl.sim', KwargInfo('data', (str, File)), KwargInfo('interface', (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList)), KwargInfo('vcd', bool, default=False))
     def sim(self, state: ModuleState, args: T.Tuple[str, T.Union[FileOrString, build.BuildTargetTypes]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
             self.detect_tools(state)
@@ -97,12 +97,17 @@ class CxxrtlModule(NewExtensionModule):
         if isinstance(interface, str):
             interface= File.from_source_file(state.environment.source_dir, state.subdir, interface)
 
+        if isinstance(interface, build.GeneratedList):
+            s = interface.get_outputs()[0]
+            rel_src = state.backend.get_target_generated_dir(self, interface, s)
+            interface = File.from_built_relative(rel_src)
+
         cmd_array = [self.tools['cxxrtl-driver'], '--design', design, '--data', data, '--interface', interface]
         if vcd:
             cmd_array.push('--vcd')
         
         out_target= build.CustomTarget(
-            f'{proj_name}.sim',
+            f'{proj_name}_sim',
             state.subdir,
             state.subproject,
             state.environment,
