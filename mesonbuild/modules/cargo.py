@@ -17,10 +17,10 @@ import typing as T
 import subprocess, shutil
 
 from . import NewExtensionModule, ModuleReturnValue, ModuleInfo
-from ..interpreterbase import typed_kwargs, typed_pos_args, KwargInfo 
+from ..interpreterbase import typed_kwargs, typed_pos_args, KwargInfo, ContainerTypeInfo 
 
 from .. import build
-from ..mesonlib import File, Popen_safe, MesonException
+from ..mesonlib import File, Popen_safe, MesonException, EnvironmentVariables
 
 from os import path
 
@@ -41,7 +41,8 @@ class CargoModule(NewExtensionModule):
         self.exe: T.Union[ExternalProgram, build.Executable] = None
         self.include_dir = None
         self.methods.update({
-            'staticlib': self.staticlib
+            'staticlib': self.staticlib,
+            'executable': self.executable
         })
 
     @typed_pos_args('cargo.staticlib', (str, File), str)
@@ -71,6 +72,54 @@ class CargoModule(NewExtensionModule):
             [f'{subdir}/Cargo.toml'],
             [staticlib],
             depfile=depfile
+        )
+
+        return ModuleReturnValue(cargo_target, [cargo_target])
+
+    @typed_pos_args('cargo.executable', (str, File), str)
+    @typed_kwargs('cargo.executable', KwargInfo('profile', str, default='dev'), KwargInfo('link_with',  ContainerTypeInfo(list, (build.SharedLibrary, build.StaticLibrary)), listify=True, default=[])) 
+    def executable(self, state: ModuleState, args: T.Tuple[FileOrString, str], kwargs: TYPE_kwargs) -> None:
+        if not self.exe:
+            self.exe = state.find_program('cargo')
+
+        subdir, manifest= args
+        profile = kwargs['profile']
+        link_with= kwargs['link_with']
+
+        m = _load_manifests(subdir)
+        bins = _load_manifests(subdir)[manifest].bin
+
+        bin = None
+        for b in bins:
+            if b.name == manifest:
+                bin = b
+                break
+
+        if not bin:
+            raise MesonException(f"{manifest} not find")
+
+        target = path.join(state.subdir, f'{bin.name}_target')
+        exe = path.join(target, 'debug' if profile == 'dev' else 'release', bin.name)
+        depfile = path.join(target, 'debug' if profile == 'dev' else 'release', f'{bin.name}.d')
+
+        link_flags = ''
+        for lib in link_with:
+            libdir = path.join(state.environment.get_build_dir(), state.backend.get_target_dir(lib))
+            link_flags += f'-L {libdir} -l{lib.name}'
+
+        env = EnvironmentVariables({'RUSTFLAGS': link_flags})
+
+        cargo_target = build.CustomTarget(
+            f'{bin.name}_cargo_exe_build',
+            state.subdir,
+            state.subproject,
+            state.environment,
+            [self.exe, 'build', '--bin', bin.name, '--manifest-path', '@INPUT@', '--target-dir', target, '--profile', profile],
+            [f'{subdir}/Cargo.toml'],
+            [exe],
+            depfile=depfile,
+            extra_depends= link_with,
+            env=env
         )
 
         return ModuleReturnValue(cargo_target, [cargo_target])
