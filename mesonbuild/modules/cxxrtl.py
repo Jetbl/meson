@@ -43,39 +43,40 @@ class CxxrtlModule(NewExtensionModule):
             'get_includes': self.get_includes,
         })
 
-    def get_include_dir(self, state: ModuleState) -> str:
-        if not self.include_dir:
-            if not self.tools:
-                self.detect_tools(state)
-
-            cmd = [shutil.which('yosys-config'), '--datdir/include']
-            p, o, e = Popen_safe(cmd, stdout=subprocess.PIPE)
-            if p.returncode != 0:
-                raise MesonException('yosys-config command failed')
-            self.include_dir = o.strip()
-
-        return self.include_dir    
 
     def detect_tools(self, state: ModuleState) -> None:
         self.tools['yosys'] = state.find_program('yosys')
         self.tools['cxxrtl-driver'] = state.find_program('cxxrtl-driver')
 
     @typed_pos_args('cxxrtl.generate', str, (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList))
-    @typed_kwargs('cxxrtl.generate', KwargInfo('script', (str, File), default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'))    
+    @typed_kwargs('cxxrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False))
     def generate(self, state: ModuleState, args: T.Tuple[str, T.List[T.Union[FileOrString, build.GeneratedTypes]]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
             self.detect_tools(state)
         proj_name, arg_src = args
         script = kwargs['script']
+        tcl = script.endswith('.tcl')
+        output = f'{proj_name}.cc'
+
+        if tcl:
+            if isinstance(script, str):
+                script = File.from_source_file(state.source_root, state.subdir, script)
+
+            cmd = [self.tools['yosys'], '-q', '-p', f"tcl {script.rel_to_builddir(state.build_to_src)} {output} @INPUT@"]
+            depend_files = [script]
+        else:
+            cmd = [self.tools['yosys'], '-q', '-p', script, '@INPUT@']
+            depend_files = []
 
         cc_target = build.CustomTarget(
-            f'{proj_name}_cc',
+            f'{proj_name}',
             state.subdir,
             state.subproject,
             state.environment,
-            [self.tools['yosys'], '-q', '-p', script, '@INPUT@'],
+            cmd,
             [arg_src],
-            [f'{proj_name}.cc'],
+            [output],
+            depend_files=depend_files
         )
 
         return ModuleReturnValue(cc_target, [cc_target])
@@ -118,6 +119,19 @@ class CxxrtlModule(NewExtensionModule):
         )
 
         return ModuleReturnValue(out_target,  [out_target])
+
+    def get_include_dir(self, state: ModuleState) -> str:
+        if not self.include_dir:
+            if not self.tools:
+                self.detect_tools(state)
+
+            cmd = [shutil.which('yosys-config'), '--datdir/include']
+            p, o, e = Popen_safe(cmd, stdout=subprocess.PIPE)
+            if p.returncode != 0:
+                raise MesonException('yosys-config command failed')
+            self.include_dir = o.strip()
+
+        return self.include_dir 
 
     @noKwargs
     @noPosargs
