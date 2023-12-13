@@ -46,14 +46,16 @@ class RsrtlModule(NewExtensionModule):
         self.tools['yosys'] = state.find_program('yosys')
 
     @typed_pos_args('rsrtl.generate', str, (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList))
-    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False))
+    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False), KwargInfo('header', bool, default=False))
     def generate(self, state: ModuleState, args: T.Tuple[str, T.List[T.Union[FileOrString, build.GeneratedTypes]]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
             self.detect_tools(state)
         proj_name, arg_src = args
         script = kwargs['script']
+        header = kwargs['header']
         tcl = script.endswith('.tcl')
         output = f'{proj_name}.cc'
+        output_header = f'{proj_name}.h'
 
         if tcl:
             if isinstance(script, str):
@@ -65,6 +67,8 @@ class RsrtlModule(NewExtensionModule):
             cmd = [self.tools['yosys'], '-q', '-p', script, '@INPUT@']
             depend_files = []
 
+        outputs = [f'{output}', f'{output_header}'] if header else [f'{output}']
+
         cc_target = build.CustomTarget(
             f'{proj_name}',
             state.subdir,
@@ -72,7 +76,7 @@ class RsrtlModule(NewExtensionModule):
             state.environment,
             cmd,
             [arg_src],
-            [output],
+            outputs,
             depend_files=depend_files
         )
 
