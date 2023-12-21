@@ -46,7 +46,7 @@ class RsrtlModule(NewExtensionModule):
         self.tools['yosys'] = state.find_program('yosys')
 
     @typed_pos_args('rsrtl.generate', str, (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList))
-    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False), KwargInfo('header', bool, default=False))
+    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False), KwargInfo('header', bool, default=False))
     def generate(self, state: ModuleState, args: T.Tuple[str, T.List[T.Union[FileOrString, build.GeneratedTypes]]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
             self.detect_tools(state)

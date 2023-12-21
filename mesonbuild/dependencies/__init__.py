@@ -190,6 +190,7 @@ packages.defaults.update({
     # From dev:
     'gtest': 'dev',
     'gmock': 'dev',
+    'cargo': 'dev',
     'llvm': 'dev',
     'valgrind': 'dev',
     'zlib': 'dev',

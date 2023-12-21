@@ -180,6 +180,17 @@ class GMockDependencyPC(PkgConfigDependency):
             name = 'gmock_main'
         super().__init__(name, environment, kwargs)
 
+class CargoDependencyConfigTool(ConfigToolDependency):
+    tool_name = 'cargo'
+
+    def __init__(self, environment: 'Environment', kwargs: T.Dict[str, T.Any]):
+        self.tools = ['cargo']
+        super().__init__('cargo', environment, kwargs, language='rust')
+        modules = stringlistify(extract_as_list(kwargs, 'modules'))
+        lib = modules[0].split('=')
+        libname = lib[0]
+        manifest = lib[1]
+        self.compile_args = self.get_config_value(['pkgconfig', '--libs', libname, '--', '--manifest-path', manifest, '--target-dir', os.path.join(environment.build_dir,'cargo', libname) ], 'linker_args')
 
 class LLVMDependencyConfigTool(ConfigToolDependency):
     """
@@ -384,6 +395,8 @@ class LLVMDependencyConfigTool(ConfigToolDependency):
 
 class LLVMDependencyCMake(CMakeDependency):
     def __init__(self, name: str, env: 'Environment', kwargs: T.Dict[str, T.Any]) -> None:
+
+        
         self.llvm_modules = stringlistify(extract_as_list(kwargs, 'modules'))
         self.llvm_opt_modules = stringlistify(extract_as_list(kwargs, 'optional_modules'))
 
@@ -481,6 +494,7 @@ class LLVMDependencyCMake(CMakeDependency):
         if orig_name:
             return orig_name[0]
         return module
+
 
 
 class ValgrindDependency(PkgConfigDependency):
@@ -676,6 +690,7 @@ class JDKSystemDependency(JNISystemDependency):
 
 packages['jdk'] = JDKSystemDependency
 
+packages['cargo'] = CargoDependencyConfigTool
 
 packages['llvm'] = llvm_factory = DependencyFactory(
     'LLVM',

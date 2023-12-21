@@ -161,10 +161,13 @@ class RustCompiler(Compiler):
         }
 
     def get_dependency_compile_args(self, dep: 'Dependency') -> T.List[str]:
-        # Rust doesn't have dependency compile arguments so simply return
-        # nothing here. Dependencies are linked and all required metadata is
+        if hasattr(dep, 'language') and dep.language == 'rust':
+            return dep.get_compile_args()
+
+        # Dependencies are linked and all required metadata is
         # provided by the linker flags.
         return []
+        
 
     def get_option_compile_args(self, options: 'KeyedOptionDictType') -> T.List[str]:
         args = []
