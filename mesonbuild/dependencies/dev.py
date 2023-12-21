@@ -196,6 +196,7 @@ class CargoDependencyConfigTool(ConfigToolDependency):
         libname = lib[0]
         manifest = lib[1]
 
+        mlog.log(f'cargo build {libname} dependency [{manifest}]')
         args = ['pkgconfig', '--libs', libname, '--', '--manifest-path', manifest, '--target-dir', os.path.join(environment.build_dir,'cargo', libname) ] + profile
         self.compile_args = self.get_config_value(args, 'linker_args')
 
