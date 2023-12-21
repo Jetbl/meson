@@ -187,10 +187,17 @@ class CargoDependencyConfigTool(ConfigToolDependency):
         self.tools = ['cargo']
         super().__init__('cargo', environment, kwargs, language='rust')
         modules = stringlistify(extract_as_list(kwargs, 'modules'))
+
+        buildtype = environment.coredata.get_option(mesonlib.OptionKey('buildtype'))
+      
+        profile = ['--release'] if buildtype == 'release' else []
+        
         lib = modules[0].split('=')
         libname = lib[0]
         manifest = lib[1]
-        self.compile_args = self.get_config_value(['pkgconfig', '--libs', libname, '--', '--manifest-path', manifest, '--target-dir', os.path.join(environment.build_dir,'cargo', libname) ], 'linker_args')
+
+        args = ['pkgconfig', '--libs', libname, '--', '--manifest-path', manifest, '--target-dir', os.path.join(environment.build_dir,'cargo', libname) ] + profile
+        self.compile_args = self.get_config_value(args, 'linker_args')
 
 class LLVMDependencyConfigTool(ConfigToolDependency):
     """
