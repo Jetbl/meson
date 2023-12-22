@@ -91,7 +91,7 @@ class RsrtlModule(NewExtensionModule):
             p, o, e = Popen_safe(cmd, stdout=subprocess.PIPE)
             if p.returncode != 0:
                 raise MesonException('yosys-config command failed')
-            self.include_dir = o.strip()
+            self.include_dir = f'{o.strip()}/backends/cxxrtl/runtime'
 
         return self.include_dir 
 
