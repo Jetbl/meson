@@ -20,7 +20,7 @@ from . import NewExtensionModule, ModuleReturnValue, ModuleInfo
 from ..interpreterbase import typed_kwargs, typed_pos_args, KwargInfo, ContainerTypeInfo 
 
 from .. import build
-from ..mesonlib import File, Popen_safe, MesonException, EnvironmentVariables
+from ..mesonlib import File, Popen_safe, MesonException, EnvironmentVariables, relpath
 
 from os import path
 
@@ -51,25 +51,27 @@ class CargoModule(NewExtensionModule):
         if not self.exe:
             self.exe = state.find_program('cargo')
 
-        subdir, manifest= args
+        manifest, libname = args
+        subdir = path.abspath(path.dirname(manifest)) 
+        # subdir = relpath (path.dirname(manifest), state.source_root) 
         profile = kwargs['profile']
 
-        lib = _load_manifests(subdir)[manifest].lib
+        # lib = _load_manifests(subdir)[libname].lib
 
-        if not 'staticlib' in lib.crate_type:
-            raise MesonException("not staticlib")
+        # if not 'staticlib' in lib.crate_type:
+        #     raise MesonException("not staticlib")
 
-        target = path.join(state.subdir, f'{lib.name}_target')
-        staticlib = path.join(target, 'debug' if profile == 'dev' else 'release', f'lib{lib.name}.a')
-        depfile = path.join(target, 'debug' if profile == 'dev' else 'release', f'lib{lib.name}.d')
+        target = path.join(state.subdir, f'{libname}_target')
+        staticlib = path.join(target, 'debug' if profile == 'dev' else 'release', f'lib{libname}.a')
+        depfile = path.join(target, 'debug' if profile == 'dev' else 'release', f'lib{libname}.d')
 
         cargo_target = build.CustomTarget(
-            f'{lib.name}_cargo_build',
+            f'{libname}_cargo_build',
             state.subdir,
             state.subproject,
             state.environment,
             [self.exe, 'build', '--lib', '--manifest-path', '@INPUT@', '--target-dir', target, '--profile', profile],
-            [f'{subdir}/Cargo.toml'],
+            [manifest],
             [staticlib],
             depfile=depfile
         )

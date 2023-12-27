@@ -46,7 +46,7 @@ class RsrtlModule(NewExtensionModule):
         self.tools['yosys'] = state.find_program('yosys')
 
     @typed_pos_args('rsrtl.generate', str, (str, File, build.CustomTarget, build.CustomTargetIndex, build.GeneratedList))
-    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='hierarchy -top main; write_cxxrtl -print-output std::cerr @OUTPUT@'), KwargInfo('tcl', bool, default=False), KwargInfo('header', bool, default=False))
+    @typed_kwargs('rsrtl.generate', KwargInfo('script', str, default='main'), KwargInfo('tcl', bool, default=False), KwargInfo('header', bool, default=False))
     def generate(self, state: ModuleState, args: T.Tuple[str, T.List[T.Union[FileOrString, build.GeneratedTypes]]], kwargs: TYPE_kwargs) -> None:
         if not self.tools:
             self.detect_tools(state)
@@ -55,6 +55,7 @@ class RsrtlModule(NewExtensionModule):
         header = kwargs['header']
         tcl = script.endswith('.tcl')
         output = f'{proj_name}.cc'
+        output_bb = f'{proj_name}_bb.cc'
         output_header = f'{proj_name}.h'
 
         if tcl:
@@ -64,10 +65,11 @@ class RsrtlModule(NewExtensionModule):
             cmd = [self.tools['yosys'], '-q', '-p', f"tcl {script.rel_to_builddir(state.build_to_src)} {output} @INPUT@"]
             depend_files = [script]
         else:
-            cmd = [self.tools['yosys'], '-q', '-p', script, '@INPUT@']
+            top = script
+            cmd = [self.tools['yosys'], '-q', '-p', f'hierarchy -top {top}; write_cxxrtl -O0 -print-output std::cerr @OUTPUT@', '@INPUT@']
             depend_files = []
 
-        outputs = [f'{output}', f'{output_header}'] if header else [f'{output}']
+        outputs = [f'{output_bb}', f'{output}', f'{output_header}'] if header else [f'{output_bb}', f'{output}']
 
         cc_target = build.CustomTarget(
             f'{proj_name}',
@@ -77,7 +79,8 @@ class RsrtlModule(NewExtensionModule):
             cmd,
             [arg_src],
             outputs,
-            depend_files=depend_files
+            depend_files=depend_files,
+            capture=True
         )
 
         return ModuleReturnValue(cc_target, [cc_target])
